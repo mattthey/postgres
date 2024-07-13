@@ -548,6 +548,7 @@ collect_visibility_data(Oid relid, bool include_pd)
  *    databases that were ignored before.
  * 2. Ignore KnownAssignedXids, because they are not database-aware. At the
  *    same time, the primary could compute its horizons database-aware.
+ * XXX: KnownAssignedXids is gone so the above comment needs updating.
  * 3. Ignore walsender xmin, because it could go backward if some replication
  *    connections don't use replication slots.
  *
@@ -558,15 +559,10 @@ collect_visibility_data(Oid relid, bool include_pd)
 static TransactionId
 GetStrictOldestNonRemovableTransactionId(Relation rel)
 {
-	RunningTransactions runningTransactions;
-
 	if (rel == NULL || rel->rd_rel->relisshared || RecoveryInProgress())
 	{
 		/* Shared relation: take into account all running xids */
-		runningTransactions = GetRunningTransactionData();
-		LWLockRelease(ProcArrayLock);
-		LWLockRelease(XidGenLock);
-		return runningTransactions->oldestRunningXid;
+		return GetOldestActiveTransactionId(true);
 	}
 	else if (!RELATION_IS_LOCAL(rel))
 	{
@@ -574,10 +570,7 @@ GetStrictOldestNonRemovableTransactionId(Relation rel)
 		 * Normal relation: take into account xids running within the current
 		 * database
 		 */
-		runningTransactions = GetRunningTransactionData();
-		LWLockRelease(ProcArrayLock);
-		LWLockRelease(XidGenLock);
-		return runningTransactions->oldestDatabaseRunningXid;
+		return GetOldestActiveTransactionId(false);
 	}
 	else
 	{
